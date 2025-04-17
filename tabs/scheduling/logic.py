@@ -1,28 +1,30 @@
-
 from db import get_connection
 
+# Original scheduling tab logic
 def fetch_jobs():
     with get_connection() as conn:
         c = conn.cursor()
         c.execute("SELECT * FROM jobs ORDER BY date")
         return c.fetchall()
 
-def refresh_job_list(job_listbox):
-    jobs = fetch_jobs()
-    job_listbox.delete(0, "end")
-    for job in jobs:
-        job_listbox.insert("end", f"{job['date']} - {job['customer_name']} - {job['service']}")
-    job_listbox.jobs = jobs
-
-def delete_job(job_listbox):
-    selected = job_listbox.curselection()
-    if not selected:
-        return
-    index = selected[0]
-    job_id = job_listbox.jobs[index]["id"]
-
+def delete_job(job_id):
     with get_connection() as conn:
         c = conn.cursor()
         c.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         conn.commit()
-    refresh_job_list(job_listbox)
+
+# Calendar-specific job logic
+def get_jobs_for_day(year, month, day):
+    date = f"{year:04d}-{month:02d}-{day:02d}"
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("SELECT job FROM calendar_jobs WHERE date = ?", (date,))
+        return [row["job"] for row in c.fetchall()]
+
+def save_job_for_day(year, month, day, job):
+    date = f"{year:04d}-{month:02d}-{day:02d}"
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("CREATE TABLE IF NOT EXISTS calendar_jobs (id INTEGER PRIMARY KEY, date TEXT, job TEXT)")
+        c.execute("INSERT INTO calendar_jobs (date, job) VALUES (?, ?)", (date, job))
+        conn.commit()
